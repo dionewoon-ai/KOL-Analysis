@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allow manual trigger from Actions tab
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,13 +23,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Decode the real data.js from the repo secret.
+      # The secret DATA_JS must be set in:
+      #   GitHub repo → Settings → Secrets and variables → Actions → New repository secret
+      #   Name: DATA_JS
+      #   Value: contents of your local data.js (copy-paste the full file)
+      - name: Inject data.js from secret
+        env:
+          DATA_JS: ${{ secrets.DATA_JS }}
+        run: |
+          if [ -z "$DATA_JS" ]; then
+            echo "ERROR: DATA_JS secret is not set. See README for setup instructions."
+            exit 1
+          fi
+          printf '%s' "$DATA_JS" > data.js
+          echo "data.js injected ($(wc -c < data.js) bytes)"
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .   # serves index.html + data.js from repo root
+          path: .
 
       - name: Deploy to GitHub Pages
         id: deployment

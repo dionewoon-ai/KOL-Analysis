@@ -69,6 +69,30 @@ Once populated, the Incrementality section shows correlated deltas and an implie
 
 > ⚠️ **Correlation only** — not true incrementality. Confounded by seasonality, feature launches, and other concurrent activity.
 
+## Keeping data.js private (GitHub Actions secret)
+
+`data.js` is gitignored — real figures never appear in the repo. The deploy workflow
+injects it from a GitHub Actions secret at build time.
+
+**One-time setup:**
+
+1. Copy the full contents of your local `data.js`
+2. Go to **github.com/dionewoon-ai/KOL-Analysis → Settings → Secrets and variables → Actions**
+3. Click **New repository secret**
+   - Name: `DATA_JS`
+   - Value: paste the full `data.js` contents
+4. Click **Add secret**
+5. Go to **Actions tab → Deploy to GitHub Pages → Re-run jobs** (or push any commit)
+
+The dashboard will be live at `https://dionewoon-ai.github.io/KOL-Analysis/`.
+When you update spend numbers, update both your local `data.js` **and** the `DATA_JS` secret.
+
+> The deployed site itself serves `data.js` publicly — anyone with the URL can view-source
+> and see the numbers. What's protected is the git history and the repo code.
+> For a fully private dashboard, use the local `open index.html` method instead.
+
+---
+
 ## Hosting on GitLab Pages
 
 1. Push this folder to a GitLab repo

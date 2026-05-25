@@ -2,3 +2,7 @@
 *.log
 node_modules/
 public/
+
+# Real campaign data — never commit this.
+# Add DATA_JS secret in GitHub repo settings instead (see README).
+data.js
