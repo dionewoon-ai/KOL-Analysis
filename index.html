@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KOL Analysis — Mini Apps Q2 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="data.js"></script>
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens ─────────────────────────────────────────────────────── */
+    :root {
+      --bg:        #fafafa;
+      --ink:       #111111;
+      --muted:     #666666;
+      --faint:     #999999;
+      --rule:      #cccccc;
+      --surface:   #f0f0f0;
+      --accent:    #0055ff;
+      --success:   #1a7a1a;
+      --warning:   #a05000;
+      --danger:    #c00000;
+      --mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --border: 1.5px solid #111111;
+      --border-light: 1px solid #cccccc;
+    }
+
+    /* ── Base ────────────────────────────────────────────────────────── */
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    #header {
+      border-bottom: var(--border);
+      padding: 16px 0;
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 50;
+    }
+    .header-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .header-title { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; text-transform: uppercase; }
+    .header-meta  { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+    /* ── Controls ────────────────────────────────────────────────────── */
+    .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .ctrl-group { display: flex; gap: 0; align-items: center; }
+    .ctrl-label { font-family: var(--mono); font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px; }
+
+    .btn {
+      padding: 4px 11px;
+      border: var(--border);
+      background: var(--bg);
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border-right: none;
+      color: var(--ink);
+      line-height: 1.4;
+      transition: background 80ms, color 80ms;
+    }
+    .btn:last-child { border-right: var(--border); }
+    .btn.active { background: var(--ink); color: var(--bg); }
+    .btn.partner { border-right: none; }
+    .btn.partner:last-child { border-right: var(--border); }
+
+    /* ── Sections ────────────────────────────────────────────────────── */
+    section { padding: 28px 0; border-bottom: var(--border-light); }
+
+    .sec-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+    }
+    .sec-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
+      padding: 1px 5px;
+      border: var(--border-light);
+    }
+
+    /* ── KPI Strip ───────────────────────────────────────────────────── */
+    .kpi-strip { display: grid; grid-template-columns: repeat(5, 1fr); border: var(--border); }
+    .kpi { padding: 14px 16px; border-right: var(--border); }
+    .kpi:last-child { border-right: none; }
+    .kpi-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .kpi-val { font-size: 22px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .kpi-sub { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 4px; }
+    .kpi-val.warn { color: var(--warning); }
+    .kpi-val.ok   { color: var(--success); }
+
+    /* ── Two-column layout ───────────────────────────────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1.4fr; gap: 28px; align-items: start; }
+    .chart-wrap { position: relative; }
+
+    /* ── Tables ─────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { border-bottom: var(--border); }
+    th {
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      padding: 6px 10px 6px 0;
+      text-align: left;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    th.r, td.r { text-align: right; padding-right: 0; padding-left: 10px; }
+    td { padding: 7px 10px 7px 0; border-bottom: var(--border-light); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tfoot tr { border-top: var(--border); }
+    tfoot td { padding-top: 10px; font-weight: 700; border-bottom: none; }
+    .striped tbody tr:nth-child(even) td { background: #f5f5f5; }
+
+    /* ── Partner dot ─────────────────────────────────────────────────── */
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+    /* ── Efficiency bar ──────────────────────────────────────────────── */
+    .eff-bar { width: 80px; height: 6px; background: var(--surface); display: inline-block; vertical-align: middle; position: relative; overflow: hidden; }
+    .eff-bar-fill { height: 100%; background: var(--ink); position: absolute; left: 0; top: 0; }
+
+    /* ── Cadence bars ────────────────────────────────────────────────── */
+    .cadence-row { display: grid; grid-template-columns: 110px 1fr 90px; gap: 12px; align-items: center; margin-bottom: 10px; }
+    .cadence-row:last-child { margin-bottom: 0; }
+    .cadence-label { font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .track { height: 10px; background: var(--surface); position: relative; }
+    .track-fill { height: 100%; position: absolute; left: 0; top: 0; background: var(--ink); }
+    .track-fill.over { background: var(--danger); }
+    .track-budget-line { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--faint); }
+    .cadence-val { font-family: var(--mono); font-size: 11px; text-align: right; }
+
+    /* ── Recs ────────────────────────────────────────────────────────── */
+    .rec-list { border: var(--border); }
+    .rec-item { display: grid; grid-template-columns: 24px 100px 1fr auto; gap: 12px; padding: 13px 16px; border-bottom: var(--border-light); align-items: start; }
+    .rec-item:last-child { border-bottom: none; }
+    .rec-n { font-family: var(--mono); font-size: 10px; color: var(--faint); padding-top: 2px; }
+    .rec-partner { font-size: 13px; font-weight: 600; padding-top: 1px; }
+    .rec-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .badge { display: inline-block; font-family: var(--mono); font-size: 10px; padding: 1px 6px; border: 1px solid; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+    .badge.up   { border-color: var(--success); color: var(--success); }
+    .badge.down { border-color: var(--danger);  color: var(--danger);  }
+    .badge.hold { border-color: var(--faint);   color: var(--faint);   }
+
+    /* ── Incrementality ──────────────────────────────────────────────── */
+    .incr-notice { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 10px 14px; border: var(--border-light); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+    .incr-notice::before { content: "!"; font-weight: 700; color: var(--warning); }
+
+    .incr-grid { display: grid; grid-template-columns: repeat(3, 1fr); border: var(--border); margin-bottom: 16px; }
+    .incr-cell { padding: 14px 16px; border-right: var(--border); }
+    .incr-cell:last-child { border-right: none; }
+    .incr-metric { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .incr-val { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .incr-delta { font-family: var(--mono); font-size: 11px; margin-top: 4px; }
+    .delta-pos { color: var(--success); }
+    .delta-neg { color: var(--danger); }
+    .delta-na  { color: var(--faint); }
+    .pending { font-family: var(--mono); font-size: 11px; color: var(--faint); background: var(--surface); padding: 2px 5px; }
+
+    /* ── Amortized view ──────────────────────────────────────────────── */
+    .amort-note { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 12px; }
+
+    /* ── Payment schedule ────────────────────────────────────────────── */
+    .status-badge { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px solid; text-transform: uppercase; }
+    .status-badge.paid    { border-color: var(--success); color: var(--success); }
+    .status-badge.pending { border-color: var(--warning); color: var(--warning); }
+    .status-badge.overdue { border-color: var(--danger);  color: var(--danger); background: #fff0f0; }
+
+    /* ── Chart toggle ────────────────────────────────────────────────── */
+    .chart-toggle-row { display: flex; gap: 4px; margin-bottom: 12px; }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    footer { padding: 20px 0; }
+    .footer-text { font-family: var(--mono); font-size: 10px; color: var(--faint); }
+
+    /* ── Hidden (partner filter) ─────────────────────────────────────── */
+    tr.hidden, .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  HEADER + CONTROLS                                                     -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="header">
+  <div class="wrap">
+    <div class="header-row">
+      <div>
+        <div class="header-title">Mini Apps — KOL Analysis</div>
+        <div class="header-meta" id="headerMeta"></div>
+      </div>
+      <div class="ctrl-group" id="periodControls"></div>
+    </div>
+    <div class="controls">
+      <span class="ctrl-label">Partners</span>
+      <div class="ctrl-group" id="partnerToggles"></div>
+      <span class="ctrl-label" style="margin-left:8px">Currency</span>
+      <div class="ctrl-group" id="currencyToggle">
+        <button class="btn active" data-currency="SGD">SGD</button>
+        <button class="btn" data-currency="USD">USD</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+<div class="wrap">
+
+  <!-- ── 1. Summary KPIs ─────────────────────────────────────────────── -->
+  <section id="sec-kpis">
+    <div id="kpiStrip"></div>
+  </section>
+
+  <!-- ── 2. Ad Spend Efficiency ──────────────────────────────────────── -->
+  <section id="sec-spend">
+    <div class="sec-head">
+      <h2>Ad Spend Efficiency</h2>
+      <span class="sec-label">per-partner breakdown</span>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="chart-toggle-row">
+          <button class="btn active" id="spendChartBtn" onclick="toggleSpendViz('chart')">Pie</button>
+          <button class="btn" id="spendTableBtn" onclick="toggleSpendViz('table')">Table</button>
+        </div>
+        <div id="spendChartWrap" class="chart-wrap"><canvas id="spendPie" height="240"></canvas></div>
+        <div id="spendTableWrap" style="display:none" id="spendTableWrap2"></div>
+      </div>
+      <div id="spendDetail"></div>
+    </div>
+  </section>
+
+  <!-- ── 3. Spending Cadence ─────────────────────────────────────────── -->
+  <section id="sec-cadence">
+    <div class="sec-head">
+      <h2>Spending Cadence</h2>
+      <span class="sec-label">budget utilisation by partner</span>
+    </div>
+    <div id="cadenceView"></div>
+  </section>
+
+  <!-- ── 4. Partner Recommendations ─────────────────────────────────── -->
+  <section id="sec-recs">
+    <div class="sec-head">
+      <h2>Partner Recommendations</h2>
+      <span class="sec-label">based on current spend efficiency</span>
+    </div>
+    <div id="recsView"></div>
+  </section>
+
+  <!-- ── 5. Incrementality ───────────────────────────────────────────── -->
+  <section id="sec-incr">
+    <div class="sec-head">
+      <h2>Incrementality</h2>
+      <span class="sec-label">brute correlation — not causal uplift</span>
+      <div class="ctrl-group" id="incrToggle" style="margin-left:auto">
+        <button class="btn active" data-metric="gmv">GMV</button>
+        <button class="btn" data-metric="orders">Orders</button>
+        <button class="btn" data-metric="weu">WEU</button>
+      </div>
+    </div>
+    <div id="incrView"></div>
+  </section>
+
+  <!-- ── 6. Monthly Amortized Spend ─────────────────────────────────── -->
+  <section id="sec-amort">
+    <div class="sec-head">
+      <h2>Monthly Amortized Spend</h2>
+      <span class="sec-label">campaign cost spread evenly over campaign duration</span>
+    </div>
+    <div id="amortView"></div>
+  </section>
+
+  <!-- ── 7. Payment Schedule ─────────────────────────────────────────── -->
+  <section id="sec-payments">
+    <div class="sec-head">
+      <h2>Payment Schedule</h2>
+      <span class="sec-label">accountability &amp; traceability</span>
+    </div>
+    <div id="paymentsView"></div>
+  </section>
+
+</div><!-- /wrap -->
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-text">
+      Source: Mini Apps KOL Planning sheet ·
+      Campaign code: <span id="footerCode"></span> ·
+      Funnel data: Mini Apps PMF Dashboard (Funnel_Weekly) ·
+      Last updated manually — run miniapps_dashboard.py to refresh funnel metrics
+    </div>
+  </div>
+</footer>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  DASHBOARD LOGIC                                                       -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<script>
+
+// ── Partner colors ─────────────────────────────────────────────────────────
+const PARTNER_COLORS = {
+  "Drivelah":  "#2563eb",
+  "HelloRide": "#16a34a",
+  "Jolibox":   "#7c3aed",
+  "Redbus":    "#dc2626",
+  "Firsty":    "#d97706",
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  period:         KOL_DATA.campaigns[0].period,
+  activePartners: new Set(KOL_DATA.partners),
+  currency:       "SGD",
+  incrMetric:     "gmv",
+  charts:         {},
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const fmt = {
+  money: (v, currency) => {
+    if (v == null || isNaN(v)) return "—";
+    const s = currency || state.currency;
+    return new Intl.NumberFormat("en-SG", {
+      style: "currency",
+      currency: s === "SGD" ? "SGD" : "USD",
+      maximumFractionDigits: 0,
+    }).format(v);
+  },
+  pct:  (v) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`,
+  date: (d) => new Date(d).toLocaleDateString("en-SG", { day: "2-digit", month: "short", year: "numeric" }),
+  num:  (v) => v == null ? "—" : Number(v).toLocaleString(),
+};
+
+function getCampaign() {
+  return KOL_DATA.campaigns.find(c => c.period === state.period);
+}
+
+function getActivePartnerData() {
+  const c = getCampaign();
+  const result = {};
+  for (const [p, d] of Object.entries(c.partners)) {
+    if (state.activePartners.has(p)) result[p] = d;
+  }
+  return result;
+}
+
+function totalField(field) {
+  const data = getActivePartnerData();
+  return Object.values(data).reduce((s, d) => s + (d[field] || 0), 0);
+}
+
+function partnerTotal(partner) {
+  return state.currency === "SGD" ? partner.totalSGD : partner.totalUSD;
+}
+
+function allVids(partnerData) {
+  return partnerData.kols.reduce((s, k) => s + k.vidsBoosted, 0);
+}
+
+function destroyCharts() {
+  Object.values(state.charts).forEach(c => c?.destroy());
+  state.charts = {};
+}
+
+// ── Render: header meta ────────────────────────────────────────────────────
+function renderHeaderMeta() {
+  const c = getCampaign();
+  document.getElementById("headerMeta").textContent =
+    `${c.period}  ·  ${fmt.date(c.startDate)} – ${fmt.date(c.endDate)}  ·  Q2 2026 Budget: ${fmt.money(KOL_DATA.quarterlyBudgetUSD, "USD")}`;
+  document.getElementById("footerCode").textContent = KOL_DATA.campaignCode;
+}
+
+// ── Render: period controls ────────────────────────────────────────────────
+function renderPeriodControls() {
+  const el = document.getElementById("periodControls");
+  el.innerHTML = KOL_DATA.campaigns.map(c =>
+    `<button class="btn ${c.period === state.period ? "active" : ""}" data-period="${c.period}">${c.period}</button>`
+  ).join("");
+  el.querySelectorAll("[data-period]").forEach(btn =>
+    btn.addEventListener("click", () => { state.period = btn.dataset.period; render(); })
+  );
+}
+
+// ── Render: partner toggles ────────────────────────────────────────────────
+function renderPartnerToggles() {
+  const el = document.getElementById("partnerToggles");
+  el.innerHTML = KOL_DATA.partners.map(p =>
+    `<button class="btn partner ${state.activePartners.has(p) ? "active" : ""}" data-partner="${p}">${p}</button>`
+  ).join("");
+  el.querySelectorAll("[data-partner]").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const p = btn.dataset.partner;
+      if (state.activePartners.has(p) && state.activePartners.size > 1) state.activePartners.delete(p);
+      else state.activePartners.add(p);
+      render();
+    })
+  );
+}
+
+// ── Render: currency toggle ────────────────────────────────────────────────
+function renderCurrencyToggle() {
+  document.querySelectorAll("[data-currency]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.currency === state.currency);
+    btn.addEventListener("click", () => { state.currency = btn.dataset.currency; render(); });
+  });
+}
+
+// ── Render: KPIs ──────────────────────────────────────────────────────────
+function renderKPIs() {
+  const partnerData = getActivePartnerData();
+  const c = getCampaign();
+
+  const totalSpend = state.currency === "SGD" ? totalField("totalSGD") : totalField("totalUSD");
+  const budgetUSD  = KOL_DATA.quarterlyBudgetUSD;
+  const spentUSD   = totalField("totalUSD");
+  const utilPct    = (spentUSD / budgetUSD * 100).toFixed(1);
+  const remainUSD  = budgetUSD - spentUSD;
+  const totalVids  = Object.values(partnerData).reduce((s, d) => s + allVids(d), 0);
+  const cpv        = totalVids > 0 ? totalSpend / totalVids : null;
+  const nKOLs      = Object.values(partnerData).reduce((s, d) => s + d.kols.length, 0);
+
+  const overBudget = spentUSD > budgetUSD;
+
+  document.getElementById("kpiStrip").innerHTML = `
+    <div class="kpi-strip">
+      <div class="kpi">
+        <div class="kpi-label">Total Spend (${state.currency})</div>
+        <div class="kpi-val">${fmt.money(totalSpend)}</div>
+        <div class="kpi-sub">${fmt.money(totalField("totalSGD"), "SGD")} SGD · ${fmt.money(totalField("totalUSD"), "USD")} USD</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Budget Utilisation (USD)</div>
+        <div class="kpi-val ${overBudget ? "warn" : "ok"}">${utilPct}%</div>
+        <div class="kpi-sub">${fmt.money(remainUSD, "USD")} remaining</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Total Vids Boosted</div>
+        <div class="kpi-val">${totalVids}</div>
+        <div class="kpi-sub">${nKOLs} KOL${nKOLs !== 1 ? "s" : ""} · ${Object.keys(partnerData).length} partners</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Cost/Vid (${state.currency})</div>
+        <div class="kpi-val">${cpv ? fmt.money(Math.round(cpv)) : "—"}</div>
+        <div class="kpi-sub">blended avg across partners</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Boosting vs KOL Split</div>
+        <div class="kpi-val">${totalField("totalSGD") > 0 ? (totalField("boostingSGD") / totalField("totalSGD") * 100).toFixed(0) : 0}%</div>
+        <div class="kpi-sub">SGD: ${fmt.money(totalField("boostingSGD"), "SGD")} boosting / ${fmt.money(totalField("totalSGD") - totalField("boostingSGD"), "SGD")} KOL fees</div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Render: Spend Efficiency ───────────────────────────────────────────────
+function renderSpend() {
+  const partnerData = getActivePartnerData();
+  const partners    = Object.keys(partnerData);
+  const values      = partners.map(p => state.currency === "SGD" ? partnerData[p].totalSGD : partnerData[p].totalUSD);
+  const total       = values.reduce((s, v) => s + v, 0);
+  const maxVid      = Math.max(...partners.map(p => allVids(partnerData[p]) || 0.01));
+  const maxSpend    = Math.max(...values);
+
+  // Detail table
+  const rows = partners.map(p => {
+    const d    = partnerData[p];
+    const v    = state.currency === "SGD" ? d.totalSGD : d.totalUSD;
+    const vids = allVids(d);
+    const cpv  = vids > 0 ? v / vids : null;
+    const share = total > 0 ? (v / total * 100).toFixed(1) : "—";
+    const effPct = maxSpend > 0 ? (v / maxSpend * 100) : 0;
+    const kolNames = d.kols.map(k => k.name).join(", ") || "TBD";
+
+    return `<tr>
+      <td><span class="dot" style="background:${PARTNER_COLORS[p]}"></span>${p}</td>
+      <td class="r">${fmt.money(v)}</td>
+      <td class="r">${fmt.money(d.boostingSGD, "SGD")}</td>
+      <td class="r">${vids || "—"}</td>
+      <td class="r">${cpv ? fmt.money(Math.round(cpv)) : "—"}</td>
+      <td class="r">${share}%</td>
+      <td style="padding-left:10px">
+        <div class="eff-bar"><div class="eff-bar-fill" style="width:${effPct}%"></div></div>
+      </td>
+    </tr>`;
+  }).join("");
+
+  const totalVids = Object.values(partnerData).reduce((s, d) => s + allVids(d), 0);
+  const blendedCPV = totalVids > 0 ? fmt.money(Math.round(total / totalVids)) : "—";
+
+  document.getElementById("spendDetail").innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Partner</th>
+          <th class="r">Total (${state.currency})</th>
+          <th class="r">Boosting (SGD)</th>
+          <th class="r">Vids</th>
+          <th class="r">CPV (${state.currency})</th>
+          <th class="r">Share</th>
+          <th style="padding-left:10px">Relative</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr>
+          <td>Total</td>
+          <td class="r">${fmt.money(total)}</td>
+          <td class="r">${fmt.money(totalField("boostingSGD"), "SGD")}</td>
+          <td class="r">${totalVids}</td>
+          <td class="r">${blendedCPV}</td>
+          <td class="r">100%</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+
+  // Pie chart
+  destroyChart("spendPie");
+  const ctx = document.getElementById("spendPie").getContext("2d");
+  state.charts["spendPie"] = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: partners,
+      datasets: [{
+        data: values,
+        backgroundColor: partners.map(p => PARTNER_COLORS[p]),
+        borderWidth: 2,
+        borderColor: "#fafafa",
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      cutout: "50%",
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { font: { family: "JetBrains Mono, monospace", size: 11 }, boxWidth: 10, padding: 12 }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${fmt.money(ctx.raw)} · ${(ctx.raw / total * 100).toFixed(1)}%`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Render: Spending Cadence ───────────────────────────────────────────────
+function renderCadence() {
+  const partnerData = getActivePartnerData();
+  const partners    = Object.keys(partnerData);
+  const budgetUSD   = KOL_DATA.quarterlyBudgetUSD;
+  const totalUSD    = totalField("totalUSD");
+  const perPartnerBudget = budgetUSD / KOL_DATA.partners.length; // equal budget share as reference
+
+  // Per-partner cadence bars
+  const maxSpendUSD = Math.max(...partners.map(p => partnerData[p].totalUSD), perPartnerBudget);
+
+  const bars = partners.map(p => {
+    const d = partnerData[p];
+    const spendUSD   = d.totalUSD;
+    const pct        = (spendUSD / maxSpendUSD * 100).toFixed(1);
+    const budgetPct  = (perPartnerBudget / maxSpendUSD * 100).toFixed(1);
+    const over       = spendUSD > perPartnerBudget;
+    const utilised   = perPartnerBudget > 0 ? (spendUSD / perPartnerBudget * 100).toFixed(0) : 0;
+
+    return `
+      <div class="cadence-row">
+        <div class="cadence-label"><span class="dot" style="background:${PARTNER_COLORS[p]}"></span>${p}</div>
+        <div class="track">
+          <div class="track-fill ${over ? "over" : ""}" style="width:${pct}%"></div>
+          <div class="track-budget-line" style="left:${budgetPct}%" title="Equal-share budget: ${fmt.money(perPartnerBudget, "USD")}"></div>
+        </div>
+        <div class="cadence-val">${fmt.money(spendUSD, "USD")}<br><span style="color:var(--faint);font-size:9px">${utilised}% of equal share</span></div>
+      </div>`;
+  }).join("");
+
+  // Overall budget bar
+  const overallPct = (totalUSD / budgetUSD * 100).toFixed(1);
+  const overBudget = totalUSD > budgetUSD;
+
+  document.getElementById("cadenceView").innerHTML = `
+    <div style="margin-bottom:20px">
+      <div class="amort-note">Per-partner comparison against equal-share budget (${fmt.money(perPartnerBudget, "USD")}/partner). Vertical bar = equal-share threshold.</div>
+      ${bars}
+    </div>
+    <div style="border-top:var(--border-light);padding-top:16px">
+      <div class="cadence-row">
+        <div class="cadence-label" style="font-weight:700">Overall</div>
+        <div class="track">
+          <div class="track-fill ${overBudget ? "over" : ""}" style="width:${Math.min(overallPct, 100)}%"></div>
+        </div>
+        <div class="cadence-val">${overallPct}%<br><span style="color:var(--faint);font-size:9px">${fmt.money(totalUSD, "USD")} / ${fmt.money(budgetUSD, "USD")}</span></div>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">
+        Remaining budget: <strong>${fmt.money(budgetUSD - totalUSD, "USD")}</strong>
+        · Jun 2026 campaigns TBD
+      </div>
+    </div>
+  `;
+}
+
+// ── Render: Partner Recommendations ───────────────────────────────────────
+function renderRecs() {
+  const partnerData = getActivePartnerData();
+  const partners    = Object.keys(partnerData);
+
+  // Score each partner by SGD cost-per-vid (lower = better)
+  const cpvSGD = partners.map(p => {
+    const d    = partnerData[p];
+    const vids = allVids(d);
+    return { partner: p, cpvSGD: vids > 0 ? d.totalSGD / vids : Infinity, vids, totalSGD: d.totalSGD, totalUSD: d.totalUSD };
+  });
+
+  const minCPV = Math.min(...cpvSGD.map(x => x.cpvSGD));
+  const maxCPV = Math.max(...cpvSGD.filter(x => isFinite(x.cpvSGD)).map(x => x.cpvSGD));
+
+  const RECS = {
+    "HelloRide": {
+      action: "up", badge: "Increase",
+      body: `Best SGD/vid efficiency at ${fmt.money(cpvSGD.find(x => x.partner === "HelloRide")?.cpvSGD, "SGD")}. Currently 25% of USD wallet. Strong engagement potential — prioritise for Q3 boosting.`
+    },
+    "Firsty": {
+      action: "up", badge: "Scale if GMV confirms",
+      body: `Smallest absolute spend (${fmt.money(partnerData["Firsty"]?.totalUSD, "USD")} USD). Mid-range SGD/vid efficiency. Increase budget only once incrementality data shows meaningful GMV uplift.`
+    },
+    "Redbus": {
+      action: "hold", badge: "Maintain",
+      body: `Two KOLs (Melody + Reefkey) cover different content formats. Solid efficiency. Hold allocation until Jun campaign data is in.`
+    },
+    "Jolibox": {
+      action: "down", badge: "Review allocation",
+      body: `Highest spend (37.5% of USD wallet), but per-vid SGD cost is above HelloRide and Redbus. Consider shifting boosting budget to HelloRide. Re-assess if GMV correlation data supports scale.`
+    },
+    "Drivelah": {
+      action: "down", badge: "Reduce boosting",
+      body: `Highest SGD/vid at ${fmt.money(cpvSGD.find(x => x.partner === "Drivelah")?.cpvSGD, "SGD")} — driven by large boosting spend (${"$4,855 SGD"}) on a single video. Validate reach metrics before repeating at this boosting level.`
+    },
+  };
+
+  const order = ["HelloRide", "Firsty", "Redbus", "Jolibox", "Drivelah"];
+  const activeOrder = order.filter(p => state.activePartners.has(p));
+
+  const items = activeOrder.map((p, i) => {
+    const r = RECS[p];
+    if (!r) return "";
+    return `
+      <div class="rec-item">
+        <div class="rec-n">0${i + 1}</div>
+        <div class="rec-partner"><span class="dot" style="background:${PARTNER_COLORS[p]}"></span>${p}</div>
+        <div class="rec-body">${r.body}</div>
+        <div><span class="badge ${r.action}">${r.badge}</span></div>
+      </div>`;
+  }).join("");
+
+  document.getElementById("recsView").innerHTML = `<div class="rec-list">${items}</div>`;
+}
+
+// ── Render: Incrementality ────────────────────────────────────────────────
+function renderIncrementality() {
+  const partnerData  = getActivePartnerData();
+  const partners     = Object.keys(partnerData);
+  const m            = state.incrMetric;
+  const metricLabel  = { gmv: "GMV (USD)", orders: "Orders", weu: "WEU" }[m];
+  const metricField  = { gmv: "gmvUSD", orders: "orders", weu: "weu" }[m];
+
+  // Check if any funnel data has been populated
+  const hasData = partners.some(p =>
+    KOL_DATA.funnel.baseline[p]?.[metricField] !== null ||
+    KOL_DATA.funnel.campaign[p]?.[metricField] !== null
+  );
+
+  const notice = `
+    <div class="incr-notice">
+      Brute correlation only — campaign period vs baseline average. Not incrementality-tested.
+      Confounded by seasonality, feature launches, and concurrent activity.
+      Populate <code>funnel{}</code> in data.js from the PMF Dashboard → Funnel_Weekly tab.
+    </div>`;
+
+  // Partner incremental grid
+  const cells = partners.map(p => {
+    const base   = KOL_DATA.funnel.baseline[p]?.[metricField];
+    const camp   = KOL_DATA.funnel.campaign[p]?.[metricField];
+    const delta  = (base != null && camp != null) ? camp - base : null;
+    const deltaPct = (base != null && base > 0 && delta != null) ? (delta / base * 100) : null;
+
+    const valDisplay = camp != null
+      ? (m === "gmv" ? fmt.money(camp, "USD") : fmt.num(camp))
+      : `<span class="pending">no data — update data.js</span>`;
+    const deltaDisplay = deltaPct != null
+      ? `<span class="${deltaPct >= 0 ? "delta-pos" : "delta-neg"}">${fmt.pct(deltaPct)}</span> vs baseline`
+      : `<span class="delta-na">baseline not set</span>`;
+
+    return `
+      <div class="incr-cell">
+        <div class="incr-metric"><span class="dot" style="background:${PARTNER_COLORS[p]}"></span>${p}</div>
+        <div class="incr-val">${valDisplay}</div>
+        <div class="incr-delta">${deltaDisplay}</div>
+      </div>`;
+  }).join("");
+
+  // ROI column (spend / correlated GMV delta) — only if data present
+  const totalDeltaGMV = partners.reduce((s, p) => {
+    const base = KOL_DATA.funnel.baseline[p]?.gmvUSD;
+    const camp = KOL_DATA.funnel.campaign[p]?.gmvUSD;
+    return s + (base != null && camp != null ? (camp - base) : 0);
+  }, 0);
+
+  const totalSpendUSD = totalField("totalUSD");
+  const roiHint = hasData && totalDeltaGMV > 0
+    ? `Correlated GMV uplift: <strong>${fmt.money(totalDeltaGMV, "USD")}</strong> · Implied spend ROI: <strong>${(totalDeltaGMV / totalSpendUSD).toFixed(2)}x</strong>`
+    : `ROI will appear here once funnel data is populated.`;
+
+  // Incrementality chart
+  const chartHtml = hasData
+    ? `<canvas id="incrChart" height="200" style="margin-top:16px"></canvas>`
+    : "";
+
+  document.getElementById("incrView").innerHTML = `
+    ${notice}
+    <div class="incr-grid">${cells}</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">${roiHint}</div>
+    ${chartHtml}
+  `;
+
+  if (hasData) {
+    destroyChart("incrChart");
+    const ctx = document.getElementById("incrChart").getContext("2d");
+    state.charts["incrChart"] = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: partners,
+        datasets: [
+          { label: `Baseline (weekly avg)`, data: partners.map(p => KOL_DATA.funnel.baseline[p]?.[metricField] ?? 0), backgroundColor: "#d0d0d0" },
+          { label: `Campaign period (weekly avg)`, data: partners.map(p => KOL_DATA.funnel.campaign[p]?.[metricField] ?? 0), backgroundColor: partners.map(p => PARTNER_COLORS[p]) },
+        ]
+      },
+      options: {
+        plugins: {
+          legend: { labels: { font: { family: "JetBrains Mono, monospace", size: 11 } } },
+          title: { display: true, text: `${metricLabel} — baseline vs campaign period`, font: { family: "JetBrains Mono, monospace", size: 11 }, color: "#666" }
+        },
+        scales: {
+          y: { ticks: { font: { family: "JetBrains Mono, monospace", size: 10 } } },
+          x: { ticks: { font: { family: "JetBrains Mono, monospace", size: 10 } } },
+        }
+      }
+    });
+  }
+
+  // Incrementality metric toggle
+  document.querySelectorAll("[data-metric]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.metric === state.incrMetric);
+    btn.onclick = () => { state.incrMetric = btn.dataset.metric; renderIncrementality(); };
+  });
+}
+
+// ── Render: Monthly Amortized Spend ───────────────────────────────────────
+function renderAmort() {
+  // Collect all months across all visible campaigns
+  const allMonths = [];
+  for (const c of KOL_DATA.campaigns) {
+    for (const m of c.monthLabels) {
+      if (!allMonths.includes(m)) allMonths.push(m);
+    }
+  }
+
+  const activePartners = [...state.activePartners];
+
+  // amort[month][partner] = share of partner spend for that month
+  const amort = {};
+  for (const m of allMonths) amort[m] = {};
+
+  for (const c of KOL_DATA.campaigns) {
+    for (const [p, d] of Object.entries(c.partners)) {
+      if (!state.activePartners.has(p)) continue;
+      const spend = state.currency === "SGD" ? d.totalSGD : d.totalUSD;
+      const share = c.months > 0 ? spend / c.months : 0;
+      for (const m of c.monthLabels) {
+        amort[m][p] = (amort[m][p] || 0) + share;
+      }
+    }
+  }
+
+  const rows = activePartners.map(p => {
+    const cells = allMonths.map(m =>
+      `<td class="r">${amort[m][p] ? fmt.money(Math.round(amort[m][p])) : "—"}</td>`
+    ).join("");
+    const total = Object.values(amort).reduce((s, mv) => s + (mv[p] || 0), 0);
+    return `<tr>
+      <td><span class="dot" style="background:${PARTNER_COLORS[p]}"></span>${p}</td>
+      ${cells}
+      <td class="r" style="font-weight:600">${fmt.money(Math.round(total))}</td>
+    </tr>`;
+  }).join("");
+
+  const footCells = allMonths.map(m => {
+    const monthTotal = Object.values(amort[m]).reduce((s, v) => s + v, 0);
+    return `<td class="r">${fmt.money(Math.round(monthTotal))}</td>`;
+  }).join("");
+  const grandTotal = activePartners.reduce((s, p) =>
+    s + Object.values(amort).reduce((ss, mv) => ss + (mv[p] || 0), 0), 0);
+
+  document.getElementById("amortView").innerHTML = `
+    <div class="amort-note">Spend distributed evenly over campaign duration. A 2-month campaign costing ${fmt.money(14855, "SGD")} contributes ${fmt.money(7428, "SGD")} per month.</div>
+    <table class="striped" style="overflow-x:auto">
+      <thead>
+        <tr>
+          <th>Partner</th>
+          ${allMonths.map(m => `<th class="r">${m}</th>`).join("")}
+          <th class="r">Total (${state.currency})</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr>
+          <td>Total</td>
+          ${footCells}
+          <td class="r">${fmt.money(Math.round(grandTotal))}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+// ── Render: Payment Schedule ───────────────────────────────────────────────
+function renderPayments() {
+  const activePartners = state.activePartners;
+  const today = new Date();
+
+  const rows = KOL_DATA.payments
+    .filter(p => activePartners.has(p.partner))
+    .map(p => {
+      const due  = new Date(p.dueDate);
+      const past = due < today;
+      const effectiveStatus = (p.status === "pending" && past) ? "overdue" : p.status;
+      const statusLabel = effectiveStatus;
+
+      return `<tr>
+        <td><span class="dot" style="background:${PARTNER_COLORS[p.partner]}"></span>${p.partner}</td>
+        <td>${p.kol}</td>
+        <td>${p.milestone}</td>
+        <td class="r">${fmt.money(p.amountUSD, "USD")}</td>
+        <td class="r" style="font-family:var(--mono);font-size:12px">${fmt.date(p.dueDate)}</td>
+        <td class="r"><span class="status-badge ${effectiveStatus}">${statusLabel}</span></td>
+      </tr>`;
+    }).join("");
+
+  const totalPayable = KOL_DATA.payments
+    .filter(p => activePartners.has(p.partner) && p.status !== "paid")
+    .reduce((s, p) => s + p.amountUSD, 0);
+  const totalPaid = KOL_DATA.payments
+    .filter(p => activePartners.has(p.partner) && p.status === "paid")
+    .reduce((s, p) => s + p.amountUSD, 0);
+
+  document.getElementById("paymentsView").innerHTML = `
+    <div style="display:flex;gap:24px;margin-bottom:16px">
+      <div><span style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;">Outstanding</span><br><strong style="font-size:18px;letter-spacing:-0.5px">${fmt.money(totalPayable, "USD")}</strong></div>
+      <div><span style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;">Paid</span><br><strong style="font-size:18px;letter-spacing:-0.5px;color:var(--success)">${fmt.money(totalPaid, "USD")}</strong></div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Partner</th>
+          <th>KOL</th>
+          <th>Milestone</th>
+          <th class="r">Amount (USD)</th>
+          <th class="r">Due Date</th>
+          <th class="r">Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:12px">
+      Payment schedules are estimated (50/50 on signing/delivery). Update status and dates in data.js → payments[].
+    </div>
+  `;
+}
+
+// ── Chart helpers ──────────────────────────────────────────────────────────
+function destroyChart(id) {
+  if (state.charts[id]) {
+    state.charts[id].destroy();
+    delete state.charts[id];
+  }
+}
+
+// ── Spend viz toggle ───────────────────────────────────────────────────────
+function toggleSpendViz(mode) {
+  document.getElementById("spendChartWrap").style.display = mode === "chart" ? "" : "none";
+  document.getElementById("spendTableWrap").style.display = mode === "table" ? "" : "none";
+  document.getElementById("spendChartBtn").classList.toggle("active", mode === "chart");
+  document.getElementById("spendTableBtn").classList.toggle("active", mode === "table");
+}
+
+// ── Main render ────────────────────────────────────────────────────────────
+function render() {
+  destroyCharts();
+  renderHeaderMeta();
+  renderPeriodControls();
+  renderPartnerToggles();
+  renderCurrencyToggle();
+  renderKPIs();
+  renderSpend();
+  renderCadence();
+  renderRecs();
+  renderIncrementality();
+  renderAmort();
+  renderPayments();
+}
+
+render();
+
+</script>
+</body>
+</html>
