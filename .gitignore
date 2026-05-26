@@ -6,3 +6,6 @@ public/
 # Real campaign data — never commit this.
 # Add DATA_JS secret in GitHub repo settings instead (see README).
 data.js
+
+# Local PMF exports (refresh funnel via sync_funnel.py)
+Mini Apps PMF Dashboard*.xlsx

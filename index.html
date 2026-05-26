@@ -191,11 +191,10 @@
     /* ── Amortized view ──────────────────────────────────────────────── */
     .amort-note { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 12px; }
 
-    /* ── Payment schedule ────────────────────────────────────────────── */
-    .status-badge { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px solid; text-transform: uppercase; }
-    .status-badge.paid    { border-color: var(--success); color: var(--success); }
-    .status-badge.pending { border-color: var(--warning); color: var(--warning); }
-    .status-badge.overdue { border-color: var(--danger);  color: var(--danger); background: #fff0f0; }
+    /* ── Timeline reference ──────────────────────────────────────────── */
+    .timeline-table { margin-bottom: 18px; }
+    .timeline-table td { font-size: 12px; }
+    .timeline-tag { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
 
     /* ── Chart toggle ────────────────────────────────────────────────── */
     .chart-toggle-row { display: flex; gap: 4px; margin-bottom: 12px; }
@@ -302,15 +301,6 @@
     <div id="amortView"></div>
   </section>
 
-  <!-- ── 7. Payment Schedule ─────────────────────────────────────────── -->
-  <section id="sec-payments">
-    <div class="sec-head">
-      <h2>Payment Schedule</h2>
-      <span class="sec-label">accountability &amp; traceability</span>
-    </div>
-    <div id="paymentsView"></div>
-  </section>
-
 </div><!-- /wrap -->
 </main>
 
@@ -319,8 +309,9 @@
     <div class="footer-text">
       Source: Mini Apps KOL Planning sheet ·
       Campaign code: <span id="footerCode"></span> ·
-      Funnel data: Mini Apps PMF Dashboard (Funnel_Weekly) ·
-      Last updated manually — run miniapps_dashboard.py to refresh funnel metrics
+      Funnel source: <span id="footerFunnelSource"></span> ·
+      Last synced: <span id="footerLastSynced"></span> ·
+      Refresh: <code>python3 scripts/sync_funnel.py</code>
     </div>
   </div>
 </footer>
@@ -401,6 +392,9 @@ function renderHeaderMeta() {
   document.getElementById("headerMeta").textContent =
     `${c.period}  ·  ${fmt.date(c.startDate)} – ${fmt.date(c.endDate)}  ·  Q2 2026 Budget: ${fmt.money(KOL_DATA.quarterlyBudgetUSD, "USD")}`;
   document.getElementById("footerCode").textContent = KOL_DATA.campaignCode;
+  document.getElementById("footerFunnelSource").textContent =
+    KOL_DATA.funnel?.pmfDashboardXlsx || KOL_DATA.funnelSource?.pmfDashboardXlsx || "—";
+  document.getElementById("footerLastSynced").textContent = KOL_DATA.funnel?.lastSynced || "never";
 }
 
 // ── Render: period controls ────────────────────────────────────────────────
@@ -696,32 +690,68 @@ function renderIncrementality() {
   const partnerData  = getActivePartnerData();
   const partners     = Object.keys(partnerData);
   const m            = state.incrMetric;
-  const metricLabel  = { gmv: "GMV (USD)", orders: "Orders", weu: "WEU" }[m];
+  const metricLabel  = { gmv: "GMV (USD/wk)", orders: "Orders/wk", weu: "WEU/wk" }[m];
   const metricField  = { gmv: "gmvUSD", orders: "orders", weu: "weu" }[m];
+  const timeline     = KOL_DATA.campaignTimeline || {};
+  const meta         = KOL_DATA.funnel?.meta || {};
 
-  // Check if any funnel data has been populated
   const hasData = partners.some(p =>
-    KOL_DATA.funnel.baseline[p]?.[metricField] !== null ||
-    KOL_DATA.funnel.campaign[p]?.[metricField] !== null
+    KOL_DATA.funnel?.baseline?.[p]?.[metricField] != null ||
+    KOL_DATA.funnel?.campaign?.[p]?.[metricField] != null
   );
 
   const notice = `
     <div class="incr-notice">
-      Brute correlation only — campaign period vs baseline average. Not incrementality-tested.
-      Confounded by seasonality, feature launches, and concurrent activity.
-      Populate <code>funnel{}</code> in data.js from the PMF Dashboard → Funnel_Weekly tab.
+      Date-sensitive correlation — not causal incrementality.
+      Baseline = 4-wk avg before <code>baselineAnchorDate</code> (post or boost start per partner).
+      Uplift = weekly avg during boost window. Edit dates in <code>data.js → campaignTimeline</code>, then run <code>sync_funnel.py</code>.
     </div>`;
 
-  // Partner incremental grid
+  // Campaign timeline reference table
+  const timelineRows = partners.map(p => {
+    const t = timeline.partners?.[p] || {};
+    const m = meta[p] || {};
+    const anchor = t.baselineAnchor || "boost";
+    const baseWeeks = m.baselineWeeks || [];
+    const upliftWeeks = m.upliftWeeks || [];
+    return `<tr>
+      <td><span class="dot" style="background:${PARTNER_COLORS[p]}"></span>${p}</td>
+      <td>${t.postDate ? fmt.date(t.postDate) : "—"}</td>
+      <td>${t.boostStart && t.boostEnd ? `${fmt.date(t.boostStart)} – ${fmt.date(t.boostEnd)}` : "—"}</td>
+      <td><span class="timeline-tag">${anchor}</span> ${m.baselineAnchorDate ? fmt.date(m.baselineAnchorDate) : "—"}</td>
+      <td style="font-family:var(--mono);font-size:11px">${baseWeeks.length ? `${baseWeeks[0].slice(5)} → ${baseWeeks[baseWeeks.length-1].slice(5)}` : "—"}</td>
+      <td style="font-family:var(--mono);font-size:11px">${upliftWeeks.length ? `${upliftWeeks[0].slice(5)} → ${upliftWeeks[upliftWeeks.length-1].slice(5)} (${upliftWeeks.length} wk)` : "—"}</td>
+    </tr>`;
+  }).join("");
+
+  const timelineTable = `
+    <div class="sec-head" style="margin-top:0;margin-bottom:10px">
+      <h2 style="font-size:10px">Campaign Timeline Reference</h2>
+      <span class="sec-label">edit in data.js → campaignTimeline</span>
+    </div>
+    <table class="striped timeline-table">
+      <thead>
+        <tr>
+          <th>Partner</th>
+          <th>Post date</th>
+          <th>Boost window</th>
+          <th>Baseline anchor</th>
+          <th>Baseline weeks</th>
+          <th>Uplift weeks</th>
+        </tr>
+      </thead>
+      <tbody>${timelineRows}</tbody>
+    </table>`;
+
   const cells = partners.map(p => {
-    const base   = KOL_DATA.funnel.baseline[p]?.[metricField];
-    const camp   = KOL_DATA.funnel.campaign[p]?.[metricField];
+    const base   = KOL_DATA.funnel?.baseline?.[p]?.[metricField];
+    const camp   = KOL_DATA.funnel?.campaign?.[p]?.[metricField];
     const delta  = (base != null && camp != null) ? camp - base : null;
     const deltaPct = (base != null && base > 0 && delta != null) ? (delta / base * 100) : null;
 
     const valDisplay = camp != null
       ? (m === "gmv" ? fmt.money(camp, "USD") : fmt.num(camp))
-      : `<span class="pending">no data — update data.js</span>`;
+      : `<span class="pending">run sync_funnel.py</span>`;
     const deltaDisplay = deltaPct != null
       ? `<span class="${deltaPct >= 0 ? "delta-pos" : "delta-neg"}">${fmt.pct(deltaPct)}</span> vs baseline`
       : `<span class="delta-na">baseline not set</span>`;
@@ -734,25 +764,24 @@ function renderIncrementality() {
       </div>`;
   }).join("");
 
-  // ROI column (spend / correlated GMV delta) — only if data present
   const totalDeltaGMV = partners.reduce((s, p) => {
-    const base = KOL_DATA.funnel.baseline[p]?.gmvUSD;
-    const camp = KOL_DATA.funnel.campaign[p]?.gmvUSD;
+    const base = KOL_DATA.funnel?.baseline?.[p]?.gmvUSD;
+    const camp = KOL_DATA.funnel?.campaign?.[p]?.gmvUSD;
     return s + (base != null && camp != null ? (camp - base) : 0);
   }, 0);
 
   const totalSpendUSD = totalField("totalUSD");
   const roiHint = hasData && totalDeltaGMV > 0
-    ? `Correlated GMV uplift: <strong>${fmt.money(totalDeltaGMV, "USD")}</strong> · Implied spend ROI: <strong>${(totalDeltaGMV / totalSpendUSD).toFixed(2)}x</strong>`
-    : `ROI will appear here once funnel data is populated.`;
+    ? `Correlated GMV uplift (boost window): <strong>${fmt.money(totalDeltaGMV, "USD")}/wk</strong> · Implied spend ROI: <strong>${(totalDeltaGMV / totalSpendUSD).toFixed(2)}x</strong>`
+    : `Run <code>python3 scripts/sync_funnel.py</code> after updating campaignTimeline dates.`;
 
-  // Incrementality chart
   const chartHtml = hasData
     ? `<canvas id="incrChart" height="200" style="margin-top:16px"></canvas>`
     : "";
 
   document.getElementById("incrView").innerHTML = `
     ${notice}
+    ${timelineTable}
     <div class="incr-grid">${cells}</div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">${roiHint}</div>
     ${chartHtml}
@@ -766,14 +795,14 @@ function renderIncrementality() {
       data: {
         labels: partners,
         datasets: [
-          { label: `Baseline (weekly avg)`, data: partners.map(p => KOL_DATA.funnel.baseline[p]?.[metricField] ?? 0), backgroundColor: "#d0d0d0" },
-          { label: `Campaign period (weekly avg)`, data: partners.map(p => KOL_DATA.funnel.campaign[p]?.[metricField] ?? 0), backgroundColor: partners.map(p => PARTNER_COLORS[p]) },
+          { label: `Baseline (4-wk pre-anchor)`, data: partners.map(p => KOL_DATA.funnel.baseline[p]?.[metricField] ?? 0), backgroundColor: "#d0d0d0" },
+          { label: `Uplift (boost window avg)`, data: partners.map(p => KOL_DATA.funnel.campaign[p]?.[metricField] ?? 0), backgroundColor: partners.map(p => PARTNER_COLORS[p]) },
         ]
       },
       options: {
         plugins: {
           legend: { labels: { font: { family: "JetBrains Mono, monospace", size: 11 } } },
-          title: { display: true, text: `${metricLabel} — baseline vs campaign period`, font: { family: "JetBrains Mono, monospace", size: 11 }, color: "#666" }
+          title: { display: true, text: `${metricLabel} — baseline vs boost window`, font: { family: "JetBrains Mono, monospace", size: 11 }, color: "#666" }
         },
         scales: {
           y: { ticks: { font: { family: "JetBrains Mono, monospace", size: 10 } } },
@@ -783,7 +812,6 @@ function renderIncrementality() {
     });
   }
 
-  // Incrementality metric toggle
   document.querySelectorAll("[data-metric]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.metric === state.incrMetric);
     btn.onclick = () => { state.incrMetric = btn.dataset.metric; renderIncrementality(); };
@@ -858,60 +886,6 @@ function renderAmort() {
   `;
 }
 
-// ── Render: Payment Schedule ───────────────────────────────────────────────
-function renderPayments() {
-  const activePartners = state.activePartners;
-  const today = new Date();
-
-  const rows = KOL_DATA.payments
-    .filter(p => activePartners.has(p.partner))
-    .map(p => {
-      const due  = new Date(p.dueDate);
-      const past = due < today;
-      const effectiveStatus = (p.status === "pending" && past) ? "overdue" : p.status;
-      const statusLabel = effectiveStatus;
-
-      return `<tr>
-        <td><span class="dot" style="background:${PARTNER_COLORS[p.partner]}"></span>${p.partner}</td>
-        <td>${p.kol}</td>
-        <td>${p.milestone}</td>
-        <td class="r">${fmt.money(p.amountUSD, "USD")}</td>
-        <td class="r" style="font-family:var(--mono);font-size:12px">${fmt.date(p.dueDate)}</td>
-        <td class="r"><span class="status-badge ${effectiveStatus}">${statusLabel}</span></td>
-      </tr>`;
-    }).join("");
-
-  const totalPayable = KOL_DATA.payments
-    .filter(p => activePartners.has(p.partner) && p.status !== "paid")
-    .reduce((s, p) => s + p.amountUSD, 0);
-  const totalPaid = KOL_DATA.payments
-    .filter(p => activePartners.has(p.partner) && p.status === "paid")
-    .reduce((s, p) => s + p.amountUSD, 0);
-
-  document.getElementById("paymentsView").innerHTML = `
-    <div style="display:flex;gap:24px;margin-bottom:16px">
-      <div><span style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;">Outstanding</span><br><strong style="font-size:18px;letter-spacing:-0.5px">${fmt.money(totalPayable, "USD")}</strong></div>
-      <div><span style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;">Paid</span><br><strong style="font-size:18px;letter-spacing:-0.5px;color:var(--success)">${fmt.money(totalPaid, "USD")}</strong></div>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Partner</th>
-          <th>KOL</th>
-          <th>Milestone</th>
-          <th class="r">Amount (USD)</th>
-          <th class="r">Due Date</th>
-          <th class="r">Status</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:12px">
-      Payment schedules are estimated (50/50 on signing/delivery). Update status and dates in data.js → payments[].
-    </div>
-  `;
-}
-
 // ── Chart helpers ──────────────────────────────────────────────────────────
 function destroyChart(id) {
   if (state.charts[id]) {
@@ -941,7 +915,6 @@ function render() {
   renderRecs();
   renderIncrementality();
   renderAmort();
-  renderPayments();
 }
 
 render();
